@@ -131,3 +131,51 @@ it.instance(
     },
   },
 )
+
+it.instance(
+  "handoff turn ownership: next build user message uses build model after plan_exit (not plan carry-forward)",
+  () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({})
+      yield* seedPlanMessage(session.id)
+
+      // Distinct models already configured via instance config below.
+      yield* runPlanExit(session.id)
+
+      const msgs = yield* sessions.messages({ sessionID: session.id })
+      const handoff = msgs.filter((m) => m.info.role === "user").at(-1)
+      if (!handoff || handoff.info.role !== "user") throw new Error("missing handoff user turn")
+
+      // Production assertion: durable handoff message is owned by build agent + build model.
+      expect(handoff.info.agent).toBe("build")
+      expect(handoff.info.model.modelID).toBe(ModelV2.ID.make("build-model"))
+      expect(handoff.info.model.providerID).toBe(ProviderV2.ID.make("test"))
+
+      // Negative: old carry-forward would stamp the last plan user model ("test-model").
+      const planCarryForward = {
+        providerID: ProviderV2.ID.make("test"),
+        modelID: ModelV2.ID.make("test-model"),
+      }
+      expect(handoff.info.model.modelID).not.toBe(planCarryForward.modelID)
+      // Reconstruct pre-fix selection: lastUser.model ?? default — would pick plan model.
+      const lastBeforeHandoff = msgs.filter((m) => m.info.role === "user").at(-2)
+      expect(lastBeforeHandoff?.info.role === "user" && lastBeforeHandoff.info.model?.modelID).toBe(
+        ModelV2.ID.make("test-model"),
+      )
+      const preFixModel =
+        lastBeforeHandoff?.info.role === "user" && lastBeforeHandoff.info.model
+          ? lastBeforeHandoff.info.model
+          : undefined
+      expect(preFixModel?.modelID).toBe(ModelV2.ID.make("test-model"))
+      expect(preFixModel?.modelID).not.toBe(handoff.info.model.modelID)
+    }),
+  {
+    config: {
+      agent: {
+        plan: { model: "test/test-model" },
+        build: { model: "test/build-model" },
+      },
+    },
+  },
+)
