@@ -188,3 +188,107 @@ test("active section with a single row shows no chevron or count and ignores cli
     app.renderer.destroy()
   }
 })
+
+test("production sequence renders running active and recent completed rows", async () => {
+  const parentMessages = [
+    { id: "user-1" } as unknown as Message,
+    { id: "assistant-1", role: "assistant" } as unknown as Message,
+  ]
+  const parts = new Map<string, Part[]>([
+    [
+      "assistant-1",
+      [
+        {
+          type: "tool",
+          tool: "task",
+          state: {
+            status: "completed",
+            input: { description: "Stale completed" },
+            title: "Stale completed",
+            output: "",
+            metadata: { sessionId: "child-stale" },
+            time: { start: 10, end: 20 },
+          },
+        } as unknown as Part,
+        {
+          type: "tool",
+          tool: "task",
+          state: {
+            status: "completed",
+            input: { description: "Newly completed" },
+            title: "Newly completed",
+            output: "",
+            metadata: { sessionId: "child-new" },
+            time: { start: 30, end: 40 },
+          },
+        } as unknown as Part,
+        {
+          type: "tool",
+          tool: "task",
+          state: {
+            status: "running",
+            input: { description: "Running worker" },
+            metadata: { sessionId: "child-run" },
+            time: { start: 50 },
+          },
+        } as unknown as Part,
+      ],
+    ],
+  ])
+
+  const childMessages = new Map<string, Message[]>([
+    ["child-run", [{ id: "run-asst-1", role: "assistant", time: { created: 50 } } as unknown as Message]],
+    ["child-new", [{ id: "new-asst-1", role: "assistant", time: { created: 30, completed: 500 } } as unknown as Message]],
+    ["child-stale", [{ id: "stale-asst-1", role: "assistant", time: { created: 10, completed: 100 } } as unknown as Message]],
+  ])
+  const childParts = new Map<string, Part[]>([
+    [
+      "run-asst-1",
+      [
+        {
+          type: "tool",
+          tool: "bash",
+          state: { status: "running", title: "compile", input: {}, time: { start: 50 } },
+        } as unknown as Part,
+      ],
+    ],
+  ])
+
+  const api = fakeApi({
+    parentMessages,
+    parentParts: (id) => parts.get(id) ?? [],
+    childParts: (id) => childParts.get(id) ?? [],
+    childMessages: (id) => childMessages.get(id) ?? [],
+    childStatuses: (id) => (id === "child-run" ? busy : undefined),
+  })
+
+  // Patch get() so history ranking has session update times (newer completed wins).
+  ;(api.state.session as { get: (id: string) => { time: { updated: number } } | undefined }).get = (id: string) => {
+    if (id === "child-new") return { time: { updated: 500 } }
+    if (id === "child-stale") return { time: { updated: 100 } }
+    if (id === "child-run") return { time: { updated: 600 } }
+    return undefined
+  }
+
+  const app = await testRender(() => <View api={api} session_id="parent" />, {
+    width: 72,
+    height: 16,
+  })
+  try {
+    await renderOnceSettled(app)
+    const frame = await captureSettledFrame(app)
+    expect(frame).toContain("Subagents")
+    expect(frame).toContain("Running worker")
+    expect(frame).toContain("Active")
+    expect(frame).toContain("bash: compile")
+    expect(frame).toContain("Recent subagents")
+    expect(frame).toContain("Newly completed")
+    expect(frame).toContain("Stale completed")
+    const recentIdx = frame.indexOf("Recent subagents")
+    const recentSlice = recentIdx >= 0 ? frame.slice(recentIdx) : ""
+    expect(recentSlice).not.toContain("Running worker")
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
