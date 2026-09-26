@@ -543,3 +543,68 @@ describe("ConfigNormalize", () => {
     expect(result.encoded.share).toBeUndefined()
   })
 })
+
+describe("ConfigNormalize production load boundary (diagnostic localization)", () => {
+  test("one invalid nested model leaf keeps a valid sibling provider and names the leaf", () => {
+    // Real normalize/load boundary used by config ingestion — not a helper reimplementation.
+    const result = ConfigNormalize.normalize({
+      providers: {
+        broken: {
+          models: {
+            chat: {
+              // Invalid nested leaf: capabilities.tools required by schema (diagnostic-only PR;
+              // capability default ownership lives in #49940/#50702).
+              capabilities: { input: ["text"], output: ["text"] },
+            },
+          },
+        },
+        healthy: { name: "Healthy" },
+      },
+    })
+
+    expect(result.encoded.providers).toEqual({ healthy: { name: "Healthy" } })
+    expect(result.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
+      ["providers", "broken", "models", "chat", "capabilities", "tools"],
+    ])
+    // Must not blame the whole provider alone.
+    expect(
+      result.diagnostics.some(
+        (item) => item.kind === "invalid" && item.path.length === 2 && item.path[0] === "providers" && item.path[1] === "broken",
+      ),
+    ).toBe(false)
+  })
+
+  test("negative: whole-object diagnostic path fails the leaf + sibling assertions", () => {
+    // Pre-fix style: discard the schema issue and only record the enclosing path.
+    const wholeObject = (path: string[]): { kind: "invalid"; path: string[]; message: string } => ({
+      kind: "invalid",
+      path,
+      message: "skipped malformed recognized value",
+    })
+    const simulated = {
+      encoded: { providers: {} as Record<string, unknown> },
+      diagnostics: [wholeObject(["providers", "broken"])],
+    }
+
+    // Sibling retention assertion (production): healthy provider must remain.
+    // Whole-object failure mode drops everything under providers → fails.
+    expect(simulated.encoded.providers).not.toEqual({ healthy: { name: "Healthy" } })
+
+    // Leaf-path assertion (production): must include capabilities.tools.
+    const paths = simulated.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)
+    expect(paths).not.toEqual([["providers", "broken", "models", "chat", "capabilities", "tools"]])
+    expect(paths.every((path) => path.length === 2)).toBe(true)
+
+    // Control: fixed normalize still satisfies both.
+    const fixed = ConfigNormalize.normalize({
+      providers: {
+        broken: { models: { chat: { capabilities: { input: ["text"], output: ["text"] } } } },
+        healthy: { name: "Healthy" },
+      },
+    })
+    expect(fixed.encoded.providers).toEqual({ healthy: { name: "Healthy" } })
+    expect(fixed.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
+      ["providers", "broken", "models", "chat", "capabilities", "tools"],
+    ])
+  })
+})
