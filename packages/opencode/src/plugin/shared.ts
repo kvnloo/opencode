@@ -193,8 +193,19 @@ export async function resolvePathPluginTarget(spec: string) {
 
 export async function checkPluginCompatibility(target: string, opencodeVersion: string, pkg?: PluginPackage) {
   if (!semver.valid(opencodeVersion) || semver.major(opencodeVersion) === 0) return
-  const hit = pkg ?? (await readPluginPackage(target).catch(() => undefined))
-  if (!hit) return
+  // Fail closed: an unreadable/malformed package.json must not disable the engines gate.
+  // Callers that already hold a package may pass it; otherwise the read error surfaces.
+  let hit = pkg
+  if (!hit) {
+    try {
+      hit = await readPluginPackage(target)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Plugin package.json could not be read for compatibility check (${target}): ${detail}`, {
+        cause: error,
+      })
+    }
+  }
   const engines = hit.json.engines
   if (!isRecord(engines)) return
   const range = engines.opencode
