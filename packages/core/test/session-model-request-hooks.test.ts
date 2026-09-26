@@ -154,3 +154,57 @@ describe("SessionModelRequest HTTP hooks", () => {
     }),
   )
 })
+
+describe("SessionModelRequest.primary with malformed tool-result transcript", () => {
+  it.effect("completes prepare with visible ERROR text and preserves sibling parts", () =>
+    Effect.gen(function* () {
+      const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer))
+      const ERROR = "ERROR: Tool result was malformed and could not be included in the request."
+      const messages = [
+        {
+          id: "msg_malformed",
+          role: "user" as const,
+          content: [
+            { type: "text" as const, text: "Please continue" },
+            {
+              type: "tool-result" as const,
+              id: "call_bad",
+              name: "read",
+              result: { type: "content" as const, value: undefined as never },
+            },
+            {
+              type: "tool-result" as const,
+              id: "call_ok",
+              name: "read",
+              result: {
+                type: "content" as const,
+                value: [{ type: "text" as const, text: "sibling ok" }],
+              },
+            },
+          ],
+        },
+      ]
+
+      const prepared = yield* requests.primary({
+        session,
+        agent: Agent.ID.make("build"),
+        model,
+        system: [],
+        messages: messages as never,
+      })
+
+      const content = prepared.request.messages[0]?.content
+      expect(content?.[0]).toMatchObject({ type: "text", text: "Please continue" })
+      expect(content?.[1]).toMatchObject({
+        type: "tool-result",
+        id: "call_bad",
+        result: { type: "text", value: ERROR },
+      })
+      expect(content?.[2]).toMatchObject({
+        type: "tool-result",
+        id: "call_ok",
+        result: { type: "content", value: [{ type: "text", text: "sibling ok" }] },
+      })
+    }).pipe(Effect.provideService(SessionModelTransport.Service, transport)),
+  )
+})

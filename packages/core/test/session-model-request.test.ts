@@ -167,3 +167,105 @@ describe("SessionModelRequest.boundImages", () => {
     expect(out[0]?.content[1]).toMatchObject({ type: "tool-result" })
   })
 })
+
+describe("SessionModelRequest.prepare production boundary (malformed tool-result)", () => {
+  const ERROR = "ERROR: Tool result was malformed and could not be included in the request."
+
+  /** Exact pipeline prepare uses after shaping. */
+  const prepareMessages = (messages: Parameters<typeof unsupportedParts>[0]) =>
+    boundImages(unsupportedParts(messages, capabilities(["text", "image"])))
+
+  test("prepare pipeline degrades malformed tool-result and preserves siblings", () => {
+    const siblingText = { type: "text" as const, text: "Image read successfully" }
+    const siblingImage = {
+      type: "file" as const,
+      uri: "data:image/png;base64,aGVsbG8=",
+      mime: "image/png",
+      name: "logo.png",
+    }
+    const malformed = {
+      type: "tool-result",
+      id: "call_bad",
+      name: "read",
+      result: { type: "content", value: undefined },
+    }
+    const validSibling = {
+      type: "tool-result",
+      id: "call_ok",
+      name: "read",
+      result: {
+        type: "content",
+        value: [siblingText, siblingImage],
+      },
+    }
+    const userText = Message.text("Continue with the results")
+    const messages = [
+      {
+        id: "msg_1",
+        role: "user",
+        content: [userText, malformed, validSibling],
+      } as never,
+    ]
+
+    let prepared: ReturnType<typeof prepareMessages>
+    expect(() => {
+      prepared = prepareMessages(messages)
+    }).not.toThrow()
+
+    const content = prepared![0]?.content
+    expect(content?.[0]).toEqual(userText)
+    expect(content?.[1]).toMatchObject({
+      type: "tool-result",
+      id: "call_bad",
+      result: { type: "text", value: ERROR },
+    })
+    expect(content?.[2]).toMatchObject({
+      type: "tool-result",
+      id: "call_ok",
+      result: {
+        type: "content",
+        value: [siblingText, siblingImage],
+      },
+    })
+  })
+
+  test("negative: pre-fix array assumption throws on malformed content value", () => {
+    // Pre-fix path assumed part.result.value was always an array and mapped it.
+    const preFixUnsupported = (messages: Parameters<typeof unsupportedParts>[0]) =>
+      messages.map((message) => ({
+        ...message,
+        content: message.content.map((part: any) => {
+          if (part.type !== "tool-result" || part.result.type !== "content") return part
+          return {
+            ...part,
+            result: {
+              ...part.result,
+              value: part.result.value.map((item: unknown) => item),
+            },
+          }
+        }),
+      }))
+
+    const messages = [
+      {
+        id: "msg_1",
+        role: "user",
+        content: [
+          {
+            type: "tool-result",
+            id: "call_bad",
+            name: "read",
+            result: { type: "content", value: undefined },
+          },
+        ],
+      } as never,
+    ]
+
+    expect(() => preFixUnsupported(messages)).toThrow()
+    expect(() => prepareMessages(messages)).not.toThrow()
+    expect(prepareMessages(messages)[0]?.content[0]).toMatchObject({
+      type: "tool-result",
+      result: { type: "text", value: ERROR },
+    })
+  })
+})
