@@ -27,3 +27,8 @@ export async function nodeFetchWithDispatcher(req: Request) {
   if (!dispatcher) return fetch(req)
   return fetch(req, { dispatcher } as RequestInit)
 }
+
+/** Resolve the cached Node undici Agent (null under Bun/browser). Used by tests. */
+export function peekNodeFetchDispatcher() {
+  return nodeDispatcher
+}
