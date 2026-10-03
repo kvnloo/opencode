@@ -13,7 +13,7 @@ import * as Client from "effect/unstable/sql/SqlClient"
 import type { Connection } from "effect/unstable/sql/SqlConnection"
 import { classifySqliteError, SqlError } from "effect/unstable/sql/SqlError"
 import * as Statement from "effect/unstable/sql/Statement"
-import { Sqlite } from "./sqlite"
+import { Sqlite, retryLocked } from "./sqlite"
 
 const ATTR_DB_SYSTEM_NAME = "db.system.name"
 
@@ -53,6 +53,7 @@ const make = (options: Config) =>
       ? Statement.defaultTransforms(options.transformResultNames).array
       : undefined
 
+    const retryIfAutocommit = retryLocked(() => native.isTransaction)
     const run = (query: string, params: ReadonlyArray<unknown> = []) =>
       Effect.withFiber<Array<Record<string, unknown>>, SqlError>((fiber) => {
         const statement = native.prepare(query)
@@ -66,7 +67,7 @@ const make = (options: Config) =>
             }),
           )
         }
-      })
+      }).pipe(retryIfAutocommit)
 
     const runValues = (query: string, params: ReadonlyArray<unknown> = []) =>
       Effect.withFiber<ReadonlyArray<ReadonlyArray<unknown>>, SqlError>((fiber) => {
@@ -84,7 +85,7 @@ const make = (options: Config) =>
             }),
           )
         }
-      })
+      }).pipe(retryIfAutocommit)
 
     const connection = identity<SqliteConnection>({
       execute(query, params, transformRows) {
