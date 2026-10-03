@@ -607,6 +607,13 @@ function isAfter(info: Info, other?: Info) {
   return info.id > other.id
 }
 
+function httpStatusCode(error: Error) {
+  const statusCode = (error as Error & { statusCode?: unknown }).statusCode
+  if (typeof statusCode !== "number") return undefined
+  if (!Number.isInteger(statusCode) || statusCode < 100 || statusCode > 599) return undefined
+  return statusCode
+}
+
 export function fromError(
   e: unknown,
   ctx: { providerID: ProviderV2.ID; aborted?: boolean },
@@ -706,8 +713,20 @@ export function fromError(
         },
         { cause: e },
       ).toObject()
-    case e instanceof Error:
+    case e instanceof Error: {
+      const statusCode = httpStatusCode(e)
+      if (statusCode !== undefined) {
+        return new APIError(
+          {
+            message: errorMessage(e),
+            statusCode,
+            isRetryable: statusCode === 408 || statusCode === 429 || statusCode >= 500,
+          },
+          { cause: e },
+        ).toObject()
+      }
       return new NamedError.Unknown({ message: errorMessage(e) }, { cause: e }).toObject()
+    }
     default:
       try {
         const parsed = ProviderError.parseStreamError(e)

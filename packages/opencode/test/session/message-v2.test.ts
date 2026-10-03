@@ -1526,6 +1526,45 @@ describe("session.message-v2.fromError", () => {
     })
   })
 
+  test("preserves HTTP status on generic Error wraps", () => {
+    const error = Object.assign(new Error("provider rejected request"), { statusCode: 401 })
+    const result = MessageV2.fromError(error, { providerID })
+
+    expect(result).toStrictEqual({
+      name: "APIError",
+      data: {
+        message: "provider rejected request",
+        statusCode: 401,
+        isRetryable: false,
+      },
+    })
+  })
+
+  test("marks retryable HTTP statuses on generic Error wraps", () => {
+    const cases = [408, 429, 500, 503]
+    for (const statusCode of cases) {
+      const error = Object.assign(new Error("temporary provider failure"), { statusCode })
+      const result = MessageV2.fromError(error, { providerID })
+      expect(SessionV1.APIError.isInstance(result)).toBe(true)
+      if (!SessionV1.APIError.isInstance(result)) continue
+      expect(result.data.statusCode).toBe(statusCode)
+      expect(result.data.isRetryable).toBe(true)
+    }
+  })
+
+  test("ignores malformed HTTP status on generic Error wraps", () => {
+    for (const statusCode of [99, 600, 429.5, Number.NaN, "429"]) {
+      const error = Object.assign(new Error("bad status"), { statusCode })
+      const result = MessageV2.fromError(error, { providerID })
+      expect(result).toStrictEqual({
+        name: "UnknownError",
+        data: {
+          message: "bad status",
+        },
+      })
+    }
+  })
+
   test("classifies ZlibError from fetch as retryable APIError", () => {
     const zlibError = new Error(
       'ZlibError fetching "https://opencode.cloudflare.dev/anthropic/messages". For more information, pass `verbose: true` in the second argument to fetch()',
