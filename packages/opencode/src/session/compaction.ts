@@ -397,7 +397,7 @@ const layer = Layer.effect(
         sessionID: input.sessionID,
         mode: "compaction",
         agent: "compaction",
-        variant: userMessage.model.variant,
+        variant: agent.variant ?? userMessage.model.variant,
         summary: true,
         path: {
           cwd: ctx.directory,
