@@ -356,6 +356,7 @@ const layer = Layer.effect(
       }
 
       const agent = yield* agents.get("compaction")
+      const variant = agent.variant ?? userMessage.model.variant
       const model = agent.model
         ? yield* provider.getModel(agent.model.providerID, agent.model.modelID).pipe(Effect.orDie)
         : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID).pipe(Effect.orDie)
@@ -397,7 +398,7 @@ const layer = Layer.effect(
         sessionID: input.sessionID,
         mode: "compaction",
         agent: "compaction",
-        variant: agent.variant ?? userMessage.model.variant,
+        variant,
         summary: true,
         path: {
           cwd: ctx.directory,
@@ -423,7 +424,10 @@ const layer = Layer.effect(
         model,
       })
       const result = yield* processor.process({
-        user: userMessage,
+        user: {
+          ...userMessage,
+          model: { ...userMessage.model, variant },
+        },
         agent,
         sessionID: input.sessionID,
         tools: {},

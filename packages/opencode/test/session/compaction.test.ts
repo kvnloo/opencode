@@ -217,9 +217,9 @@ function processorLayer(result: "continue" | "compact") {
   )
 }
 
-function cfg(compaction?: ConfigV1.Info["compaction"]) {
+function cfg(compaction?: ConfigV1.Info["compaction"], agent?: ConfigV1.Info["agent"]) {
   const base = Schema.decodeUnknownSync(ConfigV1.Info)({}) as ConfigV1.Info
-  return Layer.succeed(Config.Service, TestConfig.make({ get: () => Effect.succeed({ ...base, compaction }) }))
+  return Layer.succeed(Config.Service, TestConfig.make({ get: () => Effect.succeed({ ...base, compaction, agent }) }))
 }
 
 const defaultProvider = wide()
@@ -812,6 +812,40 @@ describe("session.compaction.prune", () => {
 })
 
 describe("session.compaction.process", () => {
+  itCompaction.instance(
+    "uses the compaction agent variant for the summary request",
+    () => {
+      const stub = llm()
+      let variant: string | undefined
+      stub.push(reply("summary", (input) => (variant = input.user.model.variant)))
+
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const msg = yield* createUserMessage(session.id, "hello")
+        yield* ssn.updateMessage({
+          ...msg,
+          model: { ...msg.model, variant: "high" },
+        })
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+
+        yield* SessionCompaction.use.process({
+          parentID: msg.id,
+          messages: msgs,
+          sessionID: session.id,
+          auto: false,
+        })
+
+        expect(variant).toBe("no-thinking")
+      }).pipe(
+        withCompaction({
+          llm: stub.llmLayer,
+          config: cfg(undefined, { compaction: { variant: "no-thinking" } }),
+        }),
+      )
+    },
+  )
+
   it.instance(
     "throws when parent is not a user message",
     Effect.gen(function* () {
