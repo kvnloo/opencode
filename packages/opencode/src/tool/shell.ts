@@ -68,6 +68,9 @@ const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurs
 type Part = {
   type: string
   text: string
+  // The argument bash passes for this word once quoting is removed. Empty when the word continues
+  // the previous part. Unset for PowerShell parts.
+  path?: string
 }
 
 type Scan = {
@@ -90,6 +93,16 @@ const resolveWasm = (asset: string) => {
 
 function parts(node: Node) {
   const out: Part[] = []
+  const root = node.tree.rootNode
+  // tree-sitter-bash ends a word at a backslash escape that follows a closing quote, so `"a"\ b/c`
+  // parses as `"a"` and `b/c` with the escape in neither. Read the source between parts to rejoin
+  // what bash treats as one word.
+  const escapes = (from: number, to?: number) =>
+    root.text
+      .slice(from - root.startIndex, to === undefined ? undefined : to - root.startIndex)
+      .match(/^(?:\\[^])*/)?.[0] ?? ""
+  let word: (Part & { path: string }) | undefined
+  let end = 0
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i)
     if (!child) continue
@@ -109,10 +122,19 @@ function parts(node: Node) {
       child.type !== "raw_string" &&
       child.type !== "concatenation"
     ) {
+      word = undefined
       continue
     }
-    out.push({ type: child.type, text: child.text })
+    const escaped = word ? escapes(end, child.startIndex) : ""
+    if (word) word.path += unescape(escaped)
+    const joined = word && end + escaped.length === child.startIndex ? word : undefined
+    if (joined) joined.path += literal(child)
+    const part = { type: child.type, text: child.text, path: joined ? "" : literal(child) }
+    out.push(part)
+    word = joined ?? part
+    end = child.endIndex
   }
+  if (word && end === node.endIndex) word.path += unescape(escapes(end))
   return out
 }
 
@@ -135,8 +157,20 @@ function unquote(text: string) {
 // Bash treats `\<char>` as a literal escape in unquoted words (e.g. `/tmp/my\ project/x`),
 // but the tree-sitter word still carries the backslash. Strip it before resolving paths so
 // `mkdir -p /tmp/my\ project/sub` and `mkdir -p "/tmp/my project/sub"` resolve identically.
+// An escaped newline is a line continuation and disappears entirely.
 function unescape(text: string) {
-  return text.replace(/\\(.)/g, "$1")
+  return text.replace(/\\([^])/g, (_, char: string) => (char === "\n" ? "" : char))
+}
+
+// Quoting decides which backslashes bash removes, so follow the parsed quoting rather than the raw
+// text: single quotes keep everything, double quotes only escape `$`, backtick, `"`, `\` and
+// newline, and a concatenation applies each rule to its own segment.
+function literal(node: Node): string {
+  if (node.type === "raw_string") return node.text.slice(1, -1)
+  if (node.type === "string")
+    return node.text.slice(1, -1).replace(/\\([$`"\\\n])/g, (_, char: string) => (char === "\n" ? "" : char))
+  if (node.type === "concatenation") return node.children.map((child) => (child ? literal(child) : "")).join("")
+  return unescape(node.text)
 }
 
 function home(text: string) {
@@ -194,6 +228,7 @@ function prefix(text: string) {
 
 function pathArgs(list: Part[], ps: boolean, cmd = false) {
   if (!ps) {
+    // cmd.exe is parsed with the bash grammar but does not use backslash escapes.
     return list
       .slice(1)
       .filter(
@@ -202,7 +237,7 @@ function pathArgs(list: Part[], ps: boolean, cmd = false) {
           !(cmd && item.text.startsWith("/")) &&
           !(list[0]?.text === "chmod" && item.text.startsWith("+")),
       )
-      .map((item) => item.text)
+      .map((item) => (cmd ? unquote(item.text) : (item.path ?? unquote(item.text))))
   }
 
   const out: string[] = []
@@ -374,7 +409,7 @@ export const ShellTool = Tool.define(
     })
 
     const argPath = Effect.fn("ShellTool.argPath")(function* (arg: string, cwd: string, ps: boolean, shell: string) {
-      const text = ps ? expand(arg, cwd, shell) : home(unescape(unquote(arg)))
+      const text = ps ? expand(arg, cwd, shell) : home(arg)
       const file = text && prefix(text)
       if (!file || dynamic(file, ps)) return
       const next = ps ? provider(file) : file
