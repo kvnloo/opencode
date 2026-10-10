@@ -475,11 +475,11 @@ describe("tool.shell permissions", () => {
       }),
     )
 
-    it.live("resolves the static head of a rejoined path arg that continues with an expansion", () =>
+    it.live("resolves the static head of a path arg that continues with an expansion", () =>
       Effect.gen(function* () {
-        // The pieces after the closing quote are rejoined into one word. A `$` in that tail must not
-        // make the scan skip the head, which already names a file outside the project.
-        const dirs = yield* quoting(["ext/secret.txt", "ext/secret$x", "proj x/secret.txt"])
+        // An expansion ends the part of the argument the scan can read, as a glob does. It must not
+        // make the scan skip what comes before it, which already names a file outside the project.
+        const dirs = yield* quoting(["ext/secret.txt", "ext/secret$x", "proj x/secret.txt", "proj "])
 
         const expansion = yield* dirs.external(`cat "${dirs.outer}/ext/secret"\\.txt$opencode_test_unset_var`)
         expect(expansion.output).toContain("SECRET")
@@ -491,10 +491,150 @@ describe("tool.shell permissions", () => {
 
         const spaced = yield* dirs.external(`cat "${dirs.outer}/proj"\\ x/secret.txt$opencode_test_unset_var`)
         expect(spaced.output).toContain("SECRET")
-        // Only the head `<outer>/proj ` is resolved, which is enough to leave the project.
-        expect(spaced.patterns).toEqual([`${dirs.outer}/*`])
+        expect(spaced.patterns).toEqual([`${dirs.outer}/proj x/*`])
+
+        // The escaped space still belongs to the head when the expansion follows it directly.
+        const gap = yield* dirs.external(`cat "${dirs.outer}/proj"\\ $opencode_test_unset_var`)
+        expect(gap.output).toContain("SECRET")
+        expect(gap.patterns).toEqual([`${dirs.outer}/*`])
+
+        const word = yield* dirs.external(`cat ${dirs.outer}/ext/secret.txt$opencode_test_unset_var`)
+        expect(word.output).toContain("SECRET")
+        expect(word.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        // Nothing after the expansion is read: its value is unknown, so `../..` here says nothing
+        // about where the argument ends up.
+        for (const arg of [
+          `${dirs.outer}/ext/secret.txt$opencode_test_unset_var/../../proj/in.txt`,
+          `"${dirs.outer}/ext/secret.txt$opencode_test_unset_var/../../proj/in.txt"`,
+          `${dirs.outer}/ext/secret.txt\`true\`/../../proj/in.txt`,
+          `"${dirs.outer}/ext/secret.txt\`true\`/../../proj/in.txt"`,
+          `"${dirs.outer}/ext/secret.txt$opencode_test_unset_var"/../../proj/in.txt`,
+        ])
+          expect((yield* dirs.external(`cat ${arg}`)).patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const inside = yield* dirs.external(`cat ${dirs.project}/in.txt$opencode_test_unset_var`)
+        expect(inside.output).toBe("inside")
+        expect(inside.patterns).toEqual([])
       }),
     )
+
+    it.live("treats an escaped or quoted expansion character in path args as literal", () =>
+      Effect.gen(function* () {
+        // `<outer>/proj$x` and `<outer>/proj\`x` are real directories next to the project.
+        const dirs = yield* quoting(["proj$x/secret.txt", "proj`x/secret.txt"])
+
+        for (const arg of [
+          `"${dirs.outer}/proj"\\$x/secret.txt`,
+          `${dirs.outer}/proj\\$x/secret.txt`,
+          `"${dirs.outer}/proj\\$x/secret.txt"`,
+          `'${dirs.outer}/proj$x/secret.txt'`,
+        ]) {
+          const result = yield* dirs.external(`cat ${arg}`)
+          expect(result.output).toContain("SECRET")
+          expect(result.patterns).toEqual([`${dirs.outer}/proj$x/*`])
+        }
+
+        for (const arg of [
+          `"${dirs.outer}/proj"\\\`x/secret.txt`,
+          `${dirs.outer}/proj\\\`x/secret.txt`,
+          `"${dirs.outer}/proj\\\`x/secret.txt"`,
+          `'${dirs.outer}/proj\`x/secret.txt'`,
+        ]) {
+          const result = yield* dirs.external(`cat ${arg}`)
+          expect(result.output).toContain("SECRET")
+          expect(result.patterns).toEqual([`${dirs.outer}/proj\`x/*`])
+        }
+      }),
+    )
+
+    it.live("treats a leading escaped or quoted parenthesis or tilde in path args as literal", () =>
+      Effect.gen(function* () {
+        // `(x` and `~` are real directories in the project, so `../..` from them leaves it.
+        const dirs = yield* quoting(["ext/secret.txt", "proj/(x/in.txt", "proj/~/in.txt"])
+
+        for (const arg of [
+          "\\(x/../../ext/secret.txt",
+          "'(x'/../../ext/secret.txt",
+          "\\~/../../ext/secret.txt",
+          '"~"/../../ext/secret.txt',
+        ]) {
+          const result = yield* dirs.external(`cat ${arg}`)
+          expect(result.output).toContain("SECRET")
+          expect(result.patterns).toEqual([`${dirs.outer}/ext/*`])
+        }
+
+        const inside = yield* dirs.external("cat \\(x/in.txt \\~/in.txt")
+        expect(inside.output).toBe("insideinside")
+        expect(inside.patterns).toEqual([])
+
+        // An unquoted leading `~` is still the home directory.
+        const home = yield* dirs.external("cat ~/opencode-test-missing/x.txt")
+        expect(home.patterns).toEqual([path.join(os.homedir(), "opencode-test-missing", "*")])
+      }),
+    )
+
+    it.live("stops a path arg at its first glob when escapes follow a closing quote", () =>
+      Effect.gen(function* () {
+        // The escapes after the closing quote are rejoined to the word, but text past a glob says
+        // nothing about which directory the glob is read from.
+        const dirs = yield* quoting(["ext/secret.txt", "proj "])
+
+        const trailing = yield* dirs.external(`cat ${dirs.outer}/ext*""\\ `)
+        expect(trailing.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const gap = yield* dirs.external(`cat ${dirs.outer}/ext*""\\ x`)
+        expect(gap.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const tail = yield* dirs.external(`cat ${dirs.outer}/ext/s*""\\ /../../proj/in.txt`)
+        expect(tail.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const rejoined = yield* dirs.external(`cat "${dirs.outer}/ext"\\/s*""\\ /../../proj/in.txt`)
+        expect(rejoined.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        // An escaped space followed by a real one ends the argument, so the next one is separate.
+        const separate = yield* dirs.external(`cat "${dirs.outer}/proj"\\  ../ext/secret.txt`)
+        expect(separate.output).toBe("SECRETSECRET")
+        expect(separate.patterns).toEqual([`${dirs.outer}/*`, `${dirs.outer}/ext/*`])
+      }),
+    )
+
+    // An escaped `(` after a closing quote is a file name character. Reading it as the start of a
+    // dynamic expression leaves only the in-project head `<outer>/proj` to be resolved.
+    for (const item of [
+      { name: "after a quoted segment", arg: (o: string) => `${o}/"proj"\\(x/secret.txt`, dir: "proj(x" },
+      {
+        name: "climbing out of a quoted in-project directory",
+        arg: (o: string) => `"${o}/proj/sub/"\\(-/../../../ext/secret.txt`,
+        dir: "ext",
+      },
+      {
+        name: "climbing out of the quoted project root",
+        arg: (o: string) => `"${o}/proj/"\\(a/../../ext/secret.txt`,
+        dir: "ext",
+      },
+      { name: "ending the word", arg: (o: string) => `"${o}/proj"\\(`, dir: "" },
+      { name: "after a double-quoted head", arg: (o: string) => `"${o}/proj"\\(x/secret.txt`, dir: "proj(x" },
+      { name: "after a single-quoted head", arg: (o: string) => `'${o}/proj'\\(x/secret.txt`, dir: "proj(x" },
+      { name: "after an escaped @", arg: (o: string) => `"${o}/proj"\\@\\(x/secret.txt`, dir: "proj@(x" },
+      { name: "before an escaped space", arg: (o: string) => `"${o}/proj"\\(\\ x/secret.txt`, dir: "proj( x" },
+    ])
+      it.live(`treats an escaped parenthesis in a rejoined path arg as literal: ${item.name}`, () =>
+        Effect.gen(function* () {
+          const dirs = yield* quoting([
+            "proj(",
+            "proj(x/secret.txt",
+            "proj@(x/secret.txt",
+            "proj( x/secret.txt",
+            "ext/secret.txt",
+            "proj/sub/(-/in.txt",
+            "proj/(a/in.txt",
+          ])
+          const result = yield* dirs.external(`cat ${item.arg(dirs.outer)}`)
+          expect(result.output).toContain("SECRET")
+          expect(result.patterns).toEqual([path.join(dirs.outer, item.dir, "*")])
+        }),
+      )
 
     it.live("treats escaped and quoted glob characters in path args as literal", () =>
       Effect.gen(function* () {

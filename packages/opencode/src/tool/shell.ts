@@ -69,10 +69,11 @@ type Part = {
   type: string
   text: string
   // The argument bash passes for this word once quoting is removed, up to its first unquoted glob
-  // character. Empty when the word continues the previous part. Unset for PowerShell parts.
+  // character or expansion. Empty when the word continues the previous part. Unset for PowerShell
+  // parts.
   path?: string
-  // Whether `path` stops at an unquoted glob character.
-  glob?: boolean
+  // Whether `path` stops at an unquoted glob character or an expansion.
+  cut?: boolean
 }
 
 type Scan = {
@@ -103,7 +104,7 @@ function parts(node: Node) {
     root.text
       .slice(from - root.startIndex, to === undefined ? undefined : to - root.startIndex)
       .match(/^(?:\\[^])*/)?.[0] ?? ""
-  let word: (Part & { path: string; glob: boolean }) | undefined
+  let word: (Part & { path: string; cut: boolean }) | undefined
   let end = 0
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i)
@@ -116,6 +117,9 @@ function parts(node: Node) {
       }
       continue
     }
+    // The source between two parts holds only escaped characters, which are literal.
+    const gap = word ? escapes(end, child.startIndex) : ""
+    if (word && !word.cut) word.path += unescape(gap)
     if (
       child.type !== "command_name" &&
       child.type !== "command_name_expr" &&
@@ -127,25 +131,18 @@ function parts(node: Node) {
       word = undefined
       continue
     }
-    const gap = word ? escapes(end, child.startIndex) : ""
     const piece = literal(child)
-    // A `$` skips a whole argument as dynamic, so a tail carrying one stays its own part. The head
-    // is then still resolved on its own, as it is when the parser splits the word.
-    const fixed = word && !dynamic(unescape(gap), false) ? word : undefined
-    if (fixed && !fixed.glob) fixed.path += unescape(gap)
-    const joined =
-      fixed && end + gap.length === child.startIndex && (fixed.glob || !dynamic(piece.path, false)) ? fixed : undefined
-    if (joined && !joined.glob) {
+    const joined = word && end + gap.length === child.startIndex ? word : undefined
+    if (joined && !joined.cut) {
       joined.path += piece.path
-      joined.glob = piece.glob
+      joined.cut = piece.cut
     }
     const part = { type: child.type, text: child.text, ...piece }
     out.push(joined ? { ...part, path: "" } : part)
     word = joined ?? part
     end = child.endIndex
   }
-  const rest = unescape(escapes(end))
-  if (word && !word.glob && end === node.endIndex && !dynamic(rest, false)) word.path += rest
+  if (word && !word.cut) word.path += unescape(escapes(end))
   return out
 }
 
@@ -176,26 +173,30 @@ function unescape(text: string) {
 // Quoting decides which backslashes bash removes, so follow the parsed quoting rather than the raw
 // text: single quotes keep everything, double quotes only escape `$`, backtick, `"`, `\` and
 // newline, and a concatenation applies each rule to its own segment.
-// Only an unquoted, unescaped `?`, `*` or `[` is a glob, so the result stops at the first of those and
-// reports it; the same characters escaped or inside quotes are part of the file name.
-function literal(node: Node): { path: string; glob: boolean } {
-  if (node.type === "raw_string") return { path: node.text.slice(1, -1), glob: false }
-  if (node.type === "string")
+// Only an unquoted, unescaped `?`, `*` or `[` is a glob, and only an unescaped `$` or backtick outside
+// single quotes starts an expansion. The result stops at the first of those and reports it; the same
+// characters escaped or quoted are part of the file name, as is any other character such as `(`.
+function literal(node: Node): { path: string; cut: boolean } {
+  if (node.type === "raw_string") return { path: node.text.slice(1, -1), cut: false }
+  if (node.type === "string") {
+    const text = node.text.slice(1, -1)
+    const fixed = text.match(/^(?:\\[^]|[^\\$`])*/)?.[0] ?? ""
     return {
-      path: node.text.slice(1, -1).replace(/\\([$`"\\\n])/g, (_, char: string) => (char === "\n" ? "" : char)),
-      glob: false,
+      path: fixed.replace(/\\([$`"\\\n])/g, (_, char: string) => (char === "\n" ? "" : char)),
+      cut: fixed.length < text.length,
     }
+  }
   if (node.type === "concatenation")
-    return node.children.reduce<{ path: string; glob: boolean }>(
+    return node.children.reduce<{ path: string; cut: boolean }>(
       (out, child) => {
-        if (!child || out.glob) return out
+        if (!child || out.cut) return out
         const next = literal(child)
-        return { path: out.path + next.path, glob: next.glob }
+        return { path: out.path + next.path, cut: next.cut }
       },
-      { path: "", glob: false },
+      { path: "", cut: false },
     )
-  const fixed = node.text.match(/^(?:\\[^]|[^\\?*[])*\\?/)?.[0] ?? ""
-  return { path: unescape(fixed), glob: fixed.length < node.text.length }
+  const fixed = node.text.match(/^(?:\\[^]|[^\\?*[$`])*\\?/)?.[0] ?? ""
+  return { path: unescape(fixed), cut: fixed.length < node.text.length }
 }
 
 function home(text: string) {
@@ -262,7 +263,11 @@ function pathArgs(list: Part[], ps: boolean, cmd = false) {
           !(cmd && item.text.startsWith("/")) &&
           !(list[0]?.text === "chmod" && item.text.startsWith("+")),
       )
-      .map((item) => (cmd ? unquote(item.text) : (item.path ?? prefix(unquote(item.text)) ?? "")))
+      .map((item) => {
+        if (cmd) return unquote(item.text)
+        // Only an unquoted, unescaped leading `~` is the home directory.
+        return item.text.startsWith("~") ? home(item.path ?? "") : (item.path ?? "")
+      })
   }
 
   const out: string[] = []
@@ -433,8 +438,8 @@ export const ShellTool = Tool.define(
       return path.resolve(root, text)
     })
 
-    // `cut` marks an argument that `parts` already cut at its first real glob character, so a glob
-    // character still in it is literal.
+    // `cut` marks an argument that `parts` already reduced to its literal text before the first real
+    // glob character or expansion, so nothing still in it is special.
     const argPath = Effect.fn("ShellTool.argPath")(function* (
       arg: string,
       cwd: string,
@@ -442,8 +447,9 @@ export const ShellTool = Tool.define(
       shell: string,
       cut: boolean,
     ) {
+      if (cut) return yield* resolvePath(arg, cwd, shell)
       const text = ps ? expand(arg, cwd, shell) : home(arg)
-      const file = text && (cut ? text : prefix(text))
+      const file = text && prefix(text)
       if (!file || dynamic(file, ps)) return
       const next = ps ? provider(file) : file
       if (!next) return
