@@ -475,6 +475,89 @@ describe("tool.shell permissions", () => {
       }),
     )
 
+    it.live("resolves the static head of a rejoined path arg that continues with an expansion", () =>
+      Effect.gen(function* () {
+        // The pieces after the closing quote are rejoined into one word. A `$` in that tail must not
+        // make the scan skip the head, which already names a file outside the project.
+        const dirs = yield* quoting(["ext/secret.txt", "ext/secret$x", "proj x/secret.txt"])
+
+        const expansion = yield* dirs.external(`cat "${dirs.outer}/ext/secret"\\.txt$opencode_test_unset_var`)
+        expect(expansion.output).toContain("SECRET")
+        expect(expansion.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const dollar = yield* dirs.external(`cat "${dirs.outer}/ext/secret"\\$x`)
+        expect(dollar.output).toContain("SECRET")
+        expect(dollar.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const spaced = yield* dirs.external(`cat "${dirs.outer}/proj"\\ x/secret.txt$opencode_test_unset_var`)
+        expect(spaced.output).toContain("SECRET")
+        // Only the head `<outer>/proj ` is resolved, which is enough to leave the project.
+        expect(spaced.patterns).toEqual([`${dirs.outer}/*`])
+      }),
+    )
+
+    it.live("treats escaped and quoted glob characters in path args as literal", () =>
+      Effect.gen(function* () {
+        // `<outer>/proj/*` is a real directory, so `\*/../..` climbs back out of the project.
+        // Cutting the argument at the `*` as if it were a glob would leave only `<outer>/proj/`.
+        const dirs = yield* quoting(["ext/secret.txt", "proj/*/in.txt", "proj/[a]/in.txt", "proj/?/in.txt"])
+
+        const escaped = yield* dirs.external(`cat ${dirs.outer}/pro\\j/\\*/../../ext/secret.txt`)
+        expect(escaped.output).toContain("SECRET")
+        expect(escaped.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const double = yield* dirs.external(`cat ${dirs.outer}/proj/"*"/../../ext/secret.txt`)
+        expect(double.output).toContain("SECRET")
+        expect(double.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const single = yield* dirs.external(`cat '${dirs.outer}/proj/?/../../ext/secret.txt'`)
+        expect(single.output).toContain("SECRET")
+        expect(single.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const bracket = yield* dirs.external(`cat ${dirs.outer}/proj/\\[a\\]/../../ext/secret.txt`)
+        expect(bracket.output).toContain("SECRET")
+        expect(bracket.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const inside = yield* dirs.external(`cat ${dirs.project}/\\*/in.txt "${dirs.project}/[a]/in.txt"`)
+        expect(inside.output).toBe("insideinside")
+        expect(inside.patterns).toEqual([])
+
+        // An unquoted glob still cuts the argument, including after a literal one.
+        const glob = yield* dirs.external(`cat ${dirs.outer}/proj/\\*/../../ext/*.txt`)
+        expect(glob.output).toContain("SECRET")
+        expect(glob.patterns).toEqual([`${dirs.outer}/ext/*`])
+      }),
+    )
+
+    it.live("drops an escaped newline in unquoted path args", () =>
+      Effect.gen(function* () {
+        // Backslash-newline is a line continuation: `ex\<newline>t` is `ext`.
+        const dirs = yield* quoting(["ext/secret.txt"])
+
+        const word = yield* dirs.external(`cat ${dirs.outer}/ex\\\nt/secret.txt`)
+        expect(word.output).toContain("SECRET")
+        expect(word.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const inside = yield* dirs.external(`cat ${dirs.project}/i\\\nn.txt`)
+        expect(inside.output).toBe("inside")
+        expect(inside.patterns).toEqual([])
+      }),
+    )
+
+    it.live("drops an escaped newline in double-quoted path args", () =>
+      Effect.gen(function* () {
+        const dirs = yield* quoting(["ext/secret.txt"])
+
+        const quoted = yield* dirs.external(`cat "${dirs.outer}/ex\\\nt/secret.txt"`)
+        expect(quoted.output).toContain("SECRET")
+        expect(quoted.patterns).toEqual([`${dirs.outer}/ext/*`])
+
+        const inside = yield* dirs.external(`cat "${dirs.project}/i\\\nn.txt"`)
+        expect(inside.output).toBe("inside")
+        expect(inside.patterns).toEqual([])
+      }),
+    )
+
     it.live("keeps backslashes in path args when the shell is cmd", () =>
       Effect.gen(function* () {
         // cmd.exe is scanned with the bash grammar but has no backslash escapes, so its arguments

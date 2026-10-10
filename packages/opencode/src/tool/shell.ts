@@ -68,9 +68,11 @@ const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurs
 type Part = {
   type: string
   text: string
-  // The argument bash passes for this word once quoting is removed. Empty when the word continues
-  // the previous part. Unset for PowerShell parts.
+  // The argument bash passes for this word once quoting is removed, up to its first unquoted glob
+  // character. Empty when the word continues the previous part. Unset for PowerShell parts.
   path?: string
+  // Whether `path` stops at an unquoted glob character.
+  glob?: boolean
 }
 
 type Scan = {
@@ -101,7 +103,7 @@ function parts(node: Node) {
     root.text
       .slice(from - root.startIndex, to === undefined ? undefined : to - root.startIndex)
       .match(/^(?:\\[^])*/)?.[0] ?? ""
-  let word: (Part & { path: string }) | undefined
+  let word: (Part & { path: string; glob: boolean }) | undefined
   let end = 0
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i)
@@ -125,16 +127,25 @@ function parts(node: Node) {
       word = undefined
       continue
     }
-    const escaped = word ? escapes(end, child.startIndex) : ""
-    if (word) word.path += unescape(escaped)
-    const joined = word && end + escaped.length === child.startIndex ? word : undefined
-    if (joined) joined.path += literal(child)
-    const part = { type: child.type, text: child.text, path: joined ? "" : literal(child) }
-    out.push(part)
+    const gap = word ? escapes(end, child.startIndex) : ""
+    const piece = literal(child)
+    // A `$` skips a whole argument as dynamic, so a tail carrying one stays its own part. The head
+    // is then still resolved on its own, as it is when the parser splits the word.
+    const fixed = word && !dynamic(unescape(gap), false) ? word : undefined
+    if (fixed && !fixed.glob) fixed.path += unescape(gap)
+    const joined =
+      fixed && end + gap.length === child.startIndex && (fixed.glob || !dynamic(piece.path, false)) ? fixed : undefined
+    if (joined && !joined.glob) {
+      joined.path += piece.path
+      joined.glob = piece.glob
+    }
+    const part = { type: child.type, text: child.text, ...piece }
+    out.push(joined ? { ...part, path: "" } : part)
     word = joined ?? part
     end = child.endIndex
   }
-  if (word && end === node.endIndex) word.path += unescape(escapes(end))
+  const rest = unescape(escapes(end))
+  if (word && !word.glob && end === node.endIndex && !dynamic(rest, false)) word.path += rest
   return out
 }
 
@@ -165,12 +176,26 @@ function unescape(text: string) {
 // Quoting decides which backslashes bash removes, so follow the parsed quoting rather than the raw
 // text: single quotes keep everything, double quotes only escape `$`, backtick, `"`, `\` and
 // newline, and a concatenation applies each rule to its own segment.
-function literal(node: Node): string {
-  if (node.type === "raw_string") return node.text.slice(1, -1)
+// Only an unquoted, unescaped `?`, `*` or `[` is a glob, so the result stops at the first of those and
+// reports it; the same characters escaped or inside quotes are part of the file name.
+function literal(node: Node): { path: string; glob: boolean } {
+  if (node.type === "raw_string") return { path: node.text.slice(1, -1), glob: false }
   if (node.type === "string")
-    return node.text.slice(1, -1).replace(/\\([$`"\\\n])/g, (_, char: string) => (char === "\n" ? "" : char))
-  if (node.type === "concatenation") return node.children.map((child) => (child ? literal(child) : "")).join("")
-  return unescape(node.text)
+    return {
+      path: node.text.slice(1, -1).replace(/\\([$`"\\\n])/g, (_, char: string) => (char === "\n" ? "" : char)),
+      glob: false,
+    }
+  if (node.type === "concatenation")
+    return node.children.reduce<{ path: string; glob: boolean }>(
+      (out, child) => {
+        if (!child || out.glob) return out
+        const next = literal(child)
+        return { path: out.path + next.path, glob: next.glob }
+      },
+      { path: "", glob: false },
+    )
+  const fixed = node.text.match(/^(?:\\[^]|[^\\?*[])*\\?/)?.[0] ?? ""
+  return { path: unescape(fixed), glob: fixed.length < node.text.length }
 }
 
 function home(text: string) {
@@ -237,7 +262,7 @@ function pathArgs(list: Part[], ps: boolean, cmd = false) {
           !(cmd && item.text.startsWith("/")) &&
           !(list[0]?.text === "chmod" && item.text.startsWith("+")),
       )
-      .map((item) => (cmd ? unquote(item.text) : (item.path ?? unquote(item.text))))
+      .map((item) => (cmd ? unquote(item.text) : (item.path ?? prefix(unquote(item.text)) ?? "")))
   }
 
   const out: string[] = []
@@ -408,9 +433,17 @@ export const ShellTool = Tool.define(
       return path.resolve(root, text)
     })
 
-    const argPath = Effect.fn("ShellTool.argPath")(function* (arg: string, cwd: string, ps: boolean, shell: string) {
+    // `cut` marks an argument that `parts` already cut at its first real glob character, so a glob
+    // character still in it is literal.
+    const argPath = Effect.fn("ShellTool.argPath")(function* (
+      arg: string,
+      cwd: string,
+      ps: boolean,
+      shell: string,
+      cut: boolean,
+    ) {
       const text = ps ? expand(arg, cwd, shell) : home(arg)
-      const file = text && prefix(text)
+      const file = text && (cut ? text : prefix(text))
       if (!file || dynamic(file, ps)) return
       const next = ps ? provider(file) : file
       if (!next) return
@@ -438,7 +471,7 @@ export const ShellTool = Tool.define(
 
         if (cmd && (FILES.has(cmd) || (shellKind === "cmd" && CMD_FILES.has(cmd)))) {
           for (const arg of pathArgs(command, ps, shellKind === "cmd")) {
-            const resolved = yield* argPath(arg, cwd, ps, shell)
+            const resolved = yield* argPath(arg, cwd, ps, shell, !ps && shellKind !== "cmd")
             yield* Effect.logInfo("resolved path", { arg, resolved })
             if (!resolved || containsPath(resolved, instance)) continue
             const dir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
