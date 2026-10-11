@@ -1,0 +1,10 @@
+PASS frozen owner/base source hashes
+PASS ordinary blacklist skips absent ID
+PASS ordinary whitelist skips absent ID and wildcard
+PASS base blacklist migration synthesizes no model
+PASS removing only synthetic package restores skip (mechanism control)
+PASS blacklist matching existing Vertex ID requests no creation
+PASS explicit authored package/name requests intentional custom definition
+PASS observation: absent Vertex whitelist ID
+PASS observation: absent Vertex blacklist ID
+SUMMARY checks=8 passed=8 failed=0 mode=observation

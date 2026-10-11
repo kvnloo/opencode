@@ -1,0 +1,181 @@
+{
+  "owner": "cleardevice",
+  "pr": 54372,
+  "owner_head": "939179ed098a0d265095bd607190139bbcdd5053",
+  "base": "7b3d4ce3a7dbd2a6d3637722a0d5f22a7d086937",
+  "mode": "frozen intended contract",
+  "type": "Extracted-function/callback checks with spy-only provider editor; not runtime acceptance",
+  "passed": 6,
+  "failed": 2,
+  "typescript_version": "5.9.3",
+  "extractions": [
+    {
+      "source": "migrate.ts",
+      "first_line": 107,
+      "last_line": 111,
+      "sha256": "b48969f1a207766e2218ab4f095c91d53d44a3c778305dd9e1e39df1e9cc71fd"
+    },
+    {
+      "source": "migrate.ts",
+      "first_line": 113,
+      "last_line": 124,
+      "sha256": "8de149a4611986ec73c9cdcf4a98eca9ad02d53432892174815aca030738603b"
+    },
+    {
+      "source": "migrate.ts",
+      "first_line": 126,
+      "last_line": 137,
+      "sha256": "3641ec9eea8086289a7ec021d18fbfeb23623b8ea2c907e6d915a94f4f8a928a"
+    },
+    {
+      "source": "migrate.ts",
+      "first_line": 139,
+      "last_line": 153,
+      "sha256": "bbc33a90d53c7f255fd659ad11c997679559268eaaf9f3a9aea67bd0e52b8437"
+    },
+    {
+      "source": "migrate.ts",
+      "first_line": 155,
+      "last_line": 172,
+      "sha256": "d2e7fbb303467e4f55a762d52c041d8b597f9b64e1323006e107a3a0f049d1e7"
+    },
+    {
+      "source": "base-migration-functions.ts",
+      "first_line": 3,
+      "last_line": 7,
+      "sha256": "f2fa9c0b711a3b4bdf4708a776e91516476d8446fba2e6d3111bd8e40386708c"
+    },
+    {
+      "source": "base-migration-functions.ts",
+      "first_line": 9,
+      "last_line": 22,
+      "sha256": "bc2d0160495a99d61c7d6dff85b03214b49eca7bdf1234807b33fa0492b60d87"
+    },
+    {
+      "source": "base-migration-functions.ts",
+      "first_line": 24,
+      "last_line": 38,
+      "sha256": "bbc33a90d53c7f255fd659ad11c997679559268eaaf9f3a9aea67bd0e52b8437"
+    },
+    {
+      "source": "base-migration-functions.ts",
+      "first_line": 40,
+      "last_line": 57,
+      "sha256": "d2e7fbb303467e4f55a762d52c041d8b597f9b64e1323006e107a3a0f049d1e7"
+    },
+    {
+      "source": "provider.ts",
+      "first_line": 176,
+      "last_line": 181,
+      "sha256": "7830d797d585bb34ebf0bb725ce98d22d9462bdb21128bffda92151b72d71b88"
+    },
+    {
+      "source": "provider.ts",
+      "first_line": 183,
+      "last_line": 187,
+      "sha256": "d3b91a54e5c117b766a618c1f92fc45c4636de507777c0293c6509ad206765d4"
+    },
+    {
+      "source": "provider.ts",
+      "first_line": 54,
+      "last_line": 95,
+      "sha256": "faf0fcd9ee6ba8c04489a433ceacaef4e415c11beef02aa0efb92fa5f97601ca"
+    }
+  ],
+  "checks": [
+    {
+      "name": "ordinary blacklist skips absent ID",
+      "status": "pass",
+      "migrated": {
+        "models": {
+          "missing": {
+            "disabled": true
+          }
+        }
+      },
+      "requested_updates": []
+    },
+    {
+      "name": "ordinary whitelist skips absent ID and wildcard",
+      "status": "pass",
+      "migrated": {
+        "models": {
+          "*": {
+            "disabled": true
+          },
+          "missing": {
+            "disabled": false
+          }
+        }
+      },
+      "requested_updates": []
+    },
+    {
+      "name": "base blacklist migration synthesizes no model",
+      "status": "pass",
+      "migrated": {},
+      "requested_updates": []
+    },
+    {
+      "name": "removing only synthetic package restores skip (mechanism control)",
+      "status": "pass",
+      "migrated": {
+        "models": {
+          "missing": {
+            "disabled": true
+          }
+        }
+      },
+      "requested_updates": []
+    },
+    {
+      "name": "blacklist matching existing Vertex ID requests no creation",
+      "status": "pass",
+      "migrated": {
+        "models": {
+          "known": {
+            "disabled": true,
+            "package": "aisdk:@ai-sdk/google-vertex/anthropic"
+          }
+        }
+      },
+      "requested_updates": []
+    },
+    {
+      "name": "explicit authored package/name requests intentional custom definition",
+      "status": "pass",
+      "config": {
+        "models": {
+          "custom": {
+            "name": "Custom",
+            "package": "aisdk:@ai-sdk/google-vertex/anthropic"
+          }
+        }
+      },
+      "requested_updates": [
+        "custom"
+      ]
+    },
+    {
+      "name": "contract: absent Vertex whitelist ID",
+      "status": "fail",
+      "expected": [],
+      "actual": [
+        "missing"
+      ]
+    },
+    {
+      "name": "contract: absent Vertex blacklist ID",
+      "status": "fail",
+      "expected": [],
+      "actual": [
+        "missing"
+      ]
+    }
+  ],
+  "limits": [
+    "No actual normalize/Schema decode/encode, Effect runtime, default-model implementation, catalog fold, model transform, activation/policy, resolver, plugin host or provider request.",
+    "ConfigProviderOptionsV1.provider is stubbed for empty options only; Provider.aisdk maps package names; configured document/source data and provider editor are bounded fixtures.",
+    "Package-removal is a synthetic-input mechanism control, not a production fix or green implementation."
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "purpose": "Portable evidence-only publication packet; no production patch",
+  "owner": "cleardevice",
+  "pr": "https://github.com/anomalyco/opencode/pull/54372",
+  "owner_head": "939179ed098a0d265095bd607190139bbcdd5053",
+  "observation_exit": 0,
+  "contract_exit": 1,
+  "observation_checks": {
+    "passed": 8,
+    "failed": 0
+  },
+  "contract_checks": {
+    "passed": 6,
+    "failed": 2
+  },
+  "files_sha256": {
+    "README.md": "0614d52bc406329ce83489645fe2ae06d18c2ae546bda0825404b3572ad83f5f",
+    "base-migration-functions.ts": "25ca8208f8e2c897523e24711dbaee594284fc192d0f6527af10aa3b5fd8a15b",
+    "contract-results.json": "84b558420d5e14a09f3909ce326701ffb64003e74898f639e59b7263d6fff219",
+    "contract.log": "b0c9fec8e52dde061af647918bad1a14ccbac5c64b7a8aace986f701d5ccecd8",
+    "observed-results.json": "b9dbb6a9411efb6289e1d544a84496e2b4e051cd7c72a17f1b1dbbaca33e013e",
+    "observed.log": "4c3511a001444649decd86eb0037c7acb046fe37d0a5bd8953541a951c6464b9",
+    "replay.cjs": "e5544433a34448273b7e485faf5039253abcd5ab3c92468f151b213ff6f416ea",
+    "source-hashes.json": "b417fa510cf7af3ea53919778fb64d3bb4b27b9428b3ab7925905d338cb47061"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "repo": "anomalyco/opencode",
+  "pr": 54372,
+  "owner": "cleardevice",
+  "owner_head": "939179ed098a0d265095bd607190139bbcdd5053",
+  "base": "7b3d4ce3a7dbd2a6d3637722a0d5f22a7d086937",
+  "owner_sources": [
+    {
+      "path": "packages/core/src/config/plugin/provider.ts",
+      "git_blob_sha": "c469803e277613aafd4a2931659780e8d89471a4"
+    },
+    {
+      "path": "packages/core/src/v1/config/migrate.ts",
+      "git_blob_sha": "e23e2b08331133f5c40284908ed422e918bfd1ab"
+    },
+    {
+      "path": "packages/schema/src/config/provider.ts",
+      "git_blob_sha": "de77345e489039c90a5687b72d1d95b7644b2618"
+    }
+  ],
+  "base_extract": {
+    "file": "base-migration-functions.ts",
+    "original_path": "packages/core/src/v1/config/migrate.ts",
+    "original_git_blob_sha": "5c645b2240ab1d566e389e10cc4ec427f479b36d",
+    "sha256": "25ca8208f8e2c897523e24711dbaee594284fc192d0f6527af10aa3b5fd8a15b",
+    "functions": [
+      {
+        "name": "migrateProvider",
+        "first_line": 106,
+        "last_line": 110,
+        "original_text_sha256": "b48969f1a207766e2218ab4f095c91d53d44a3c778305dd9e1e39df1e9cc71fd"
+      },
+      {
+        "name": "migrateStandardProvider",
+        "first_line": 112,
+        "last_line": 125,
+        "original_text_sha256": "bc2d0160495a99d61c7d6dff85b03214b49eca7bdf1234807b33fa0492b60d87"
+      },
+      {
+        "name": "migrateAzureCognitiveServicesProvider",
+        "first_line": 127,
+        "last_line": 141,
+        "original_text_sha256": "bbc33a90d53c7f255fd659ad11c997679559268eaaf9f3a9aea67bd0e52b8437"
+      },
+      {
+        "name": "migrateGoogleVertexAnthropicProvider",
+        "first_line": 143,
+        "last_line": 160,
+        "original_text_sha256": "d2e7fbb303467e4f55a762d52c041d8b597f9b64e1323006e107a3a0f049d1e7"
+      }
+    ]
+  }
+}
