@@ -1,0 +1,8 @@
+{
+  // Schema-valid legacy override.
+  "instructions": ["./TEAM.md"],
+  "mcp": {
+    "github": {"enabled": false}
+  }
+}
+

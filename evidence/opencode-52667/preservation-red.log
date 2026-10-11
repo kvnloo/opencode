@@ -1,0 +1,15 @@
+SOURCE_IDENTITY_PASS packages/cli/src/commands/handlers/mcp/add.ts b90a09bb91003b06d0c7444d564a5839046db289
+SOURCE_IDENTITY_PASS packages/core/src/config/normalize.ts 2805cc04cd31b1ab024f3078975662dfc32104a2
+SOURCE_IDENTITY_PASS packages/core/src/v1/config/migrate.ts ccc70d8782077db45dd9c17951b65d01b39dca03
+SOURCE_IDENTITY_PASS packages/ai/src/utils/record.ts a121fbde11a543fc674b2037fc051124492c1775
+SOURCE_IDENTITY_PASS packages/core/src/v1/config/config.ts ff77cc8d38b0bb1092dbb618a35eed8807131497
+SOURCE_IDENTITY_PASS packages/core/src/config.ts a56c1119f91b028ee41acdb1d61b9ec5c8dd5c50
+SOURCE_IDENTITY_PASS packages/core/test/config/normalization.test.ts d8ee670b7cb073da5f116435e3579fc7f0a5eb9b
+RED conditional owner-preservation target: enabled-only ordinary flat legacy map
+  actual=["mcp","servers","probe"]
+  expected=["mcp","probe"]
+RED conditional owner-preservation target: enabled-only legacy server literally servers plus typed sibling
+  actual=["mcp","servers","probe"]
+  expected=["mcp","probe"]
+RESULT mode=preservation-red passed=0 failed=2
+LIMIT extracted source only; JSONC writer, full schema and CLI were not run

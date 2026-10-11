@@ -1,0 +1,6 @@
+{
+  // Explicit empty native map.
+  "instructions": ["./TEAM.md"],
+  "mcp": {"servers": {}}
+}
+

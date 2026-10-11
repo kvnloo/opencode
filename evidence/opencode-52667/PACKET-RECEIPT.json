@@ -1,0 +1,48 @@
+{
+  "repository": "anomalyco/opencode",
+  "owner_credit": "yaohuangguan",
+  "AI_preparation": "Independent evidence packet prepared with AI assistance; original implementation credit remains with the PR owner.",
+  "head": "e8f3fddf9913adc1254cd50ad3d65ed798e0b4e1",
+  "base": "7b3d4ce3a7dbd2a6d3637722a0d5f22a7d086937",
+  "intended_branch_base": "exact owner head; evidence-only changes",
+  "baseline_distinction": "Uncovered pre-existing compatibility gap; incomplete fix, not a new regression.",
+  "runtime": "Node v24.19.0",
+  "requirements": "Seven pre-existing exact source files from source-identities.json; Node v24; no dependencies installed or downloaded.",
+  "commands": [
+    {
+      "command": "node --disable-warning=ExperimentalWarning evidence/opencode-52667/run.mjs --repo . --mode observations",
+      "actual_exit": 0,
+      "pass": 24,
+      "fail": 0
+    },
+    {
+      "command": "node --disable-warning=ExperimentalWarning evidence/opencode-52667/run.mjs --repo . --mode preservation-red",
+      "actual_exit": 1,
+      "pass": 0,
+      "fail": 2,
+      "expectations": "frozen conditional owner-goal targets; maintainer design not assumed"
+    },
+    {
+      "command": "node --disable-warning=ExperimentalWarning evidence/opencode-52667/identity-negative.mjs --repo .",
+      "actual_exit": 0,
+      "identity_gates": 7,
+      "mutation": "one extra newline byte in memory; no checkout mutation"
+    }
+  ],
+  "normalizer_scope": {
+    "minimal_collision_checks": 2,
+    "codec_standin_calls_for_collisions": 0,
+    "controlled_valid_local_checks": 4,
+    "controls": "Narrow decode/canonicalization stand-ins explicitly disclosed. Typed github survives; nested probe omitted."
+  },
+  "independent_verification": "Code adaptation inspected and replayed: 24 observations pass, 2 conditional RED probes fail as expected, seven source identities pass.",
+  "not_tested": [
+    "actual JSONC writer/comments/trailing commas",
+    "filesystem config write",
+    "CLI invocation",
+    "Effect and final Info decode",
+    "MCP launch",
+    "package suites/typecheck/CI"
+  ],
+  "external_actions": "No upstream post, commit or push performed by packet preparer."
+}

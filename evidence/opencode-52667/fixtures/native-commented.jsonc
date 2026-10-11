@@ -1,0 +1,12 @@
+{
+  // Native config with unrelated fields.
+  "instructions": ["./TEAM.md"],
+  "mcp": {
+    "timeout": {"startup": 1000},
+    "servers": {
+      // A server named servers inside the native container.
+      "servers": {"type": "local", "command": ["echo", "ok"]}
+    }
+  }
+}
+

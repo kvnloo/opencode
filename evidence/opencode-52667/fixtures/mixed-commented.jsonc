@@ -1,0 +1,12 @@
+{
+  // Existing mixed input; no conversion preference is claimed.
+  "model": "anthropic/claude-haiku-4-5",
+  "mcp": {
+    "github": {"type": "local", "command": ["gh", "mcp"]},
+    "servers": {
+      // Keep native comment.
+      "native": {"type": "remote", "url": "https://example.invalid/mcp"}
+    }
+  }
+}
+

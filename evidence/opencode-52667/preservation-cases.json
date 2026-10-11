@@ -1,0 +1,43 @@
+{
+  "basis": "Conditional acceptance from yaohuangguan's stated preservation goal; maintainer detection design remains open.",
+  "head": "e8f3fddf9913adc1254cd50ad3d65ed798e0b4e1",
+  "cases": [
+    {
+      "name": "enabled-only ordinary flat legacy map",
+      "config": {
+        "mcp": {
+          "github": {
+            "enabled": false
+          }
+        }
+      },
+      "serverName": "probe",
+      "expectedTarget": [
+        "mcp",
+        "probe"
+      ]
+    },
+    {
+      "name": "enabled-only legacy server literally servers plus typed sibling",
+      "config": {
+        "mcp": {
+          "github": {
+            "type": "local",
+            "command": [
+              "gh",
+              "mcp"
+            ]
+          },
+          "servers": {
+            "enabled": false
+          }
+        }
+      },
+      "serverName": "probe",
+      "expectedTarget": [
+        "mcp",
+        "probe"
+      ]
+    }
+  ]
+}

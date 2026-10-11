@@ -1,0 +1,11 @@
+{
+  // Preserve the legacy container and this global note.
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-haiku-4-5", // unrelated
+  "mcp": {
+    // Existing server comment.
+    "github": {"type": "local", "command": ["gh", "mcp"]}
+  },
+  "instructions": ["./TEAM.md"] // unrelated trailing field
+}
+

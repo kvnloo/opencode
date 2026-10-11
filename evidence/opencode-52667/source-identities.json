@@ -1,0 +1,45 @@
+{
+  "repository": "anomalyco/opencode",
+  "owner": "yaohuangguan",
+  "head": "e8f3fddf9913adc1254cd50ad3d65ed798e0b4e1",
+  "base": "7b3d4ce3a7dbd2a6d3637722a0d5f22a7d086937",
+  "baseline_writer_blob": "9e8a7087d37991ee5f4a289a3609d68dbcee1b22",
+  "baseline_behavior": "Always selected [mcp,servers,name]; uncovered pre-existing compatibility gap, not a new regression.",
+  "sources": {
+    "packages/cli/src/commands/handlers/mcp/add.ts": {
+      "bytes": 3662,
+      "sha256": "182ef4e2f144b50a7eccdaf95d5cbc209541cd07afa33b2f63f895893451969a",
+      "git_blob_sha1": "b90a09bb91003b06d0c7444d564a5839046db289"
+    },
+    "packages/core/src/config/normalize.ts": {
+      "bytes": 31110,
+      "sha256": "81c54045fed06f251c325136461498efc833aaaeb3b07e41b9e748131b61e57e",
+      "git_blob_sha1": "2805cc04cd31b1ab024f3078975662dfc32104a2"
+    },
+    "packages/core/src/v1/config/migrate.ts": {
+      "bytes": 12987,
+      "sha256": "99f75c021f6e037401467faa57e9ccd91678fc54460f6056e3be573ee0c8d3cb",
+      "git_blob_sha1": "ccc70d8782077db45dd9c17951b65d01b39dca03"
+    },
+    "packages/ai/src/utils/record.ts": {
+      "bytes": 257,
+      "sha256": "d231e3f27c46bea0337dfaca41704d3729cd12b31f19c3afa0fb8112ec203a30",
+      "git_blob_sha1": "a121fbde11a543fc674b2037fc051124492c1775"
+    },
+    "packages/core/src/v1/config/config.ts": {
+      "bytes": 9798,
+      "sha256": "1be2f6a722603d90566dcb8464ac961224594edc9775d2edd16bcedf8b3bb58a",
+      "git_blob_sha1": "ff77cc8d38b0bb1092dbb618a35eed8807131497"
+    },
+    "packages/core/src/config.ts": {
+      "bytes": 15947,
+      "sha256": "1f93b47731ed177dced40d71aaa3c586a10ddf41ad6714ae2fe165c7f09ba253",
+      "git_blob_sha1": "a56c1119f91b028ee41acdb1d61b9ec5c8dd5c50"
+    },
+    "packages/core/test/config/normalization.test.ts": {
+      "bytes": 21274,
+      "sha256": "349d8e961806c7d998f07a51ee3e609ace71bbc3ecefba8d933a3df4577bbc0f",
+      "git_blob_sha1": "d8ee670b7cb073da5f116435e3579fc7f0a5eb9b"
+    }
+  }
+}

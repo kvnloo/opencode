@@ -1,0 +1,8 @@
+{
+  // A literal legacy server name, not a V2 servers container.
+  "mcp": {
+    "github": {"type": "local", "command": ["gh", "mcp"]},
+    "servers": {"enabled": false}
+  }
+}
+
