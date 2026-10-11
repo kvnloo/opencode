@@ -1,0 +1,10 @@
+{"subject":"base","blob":"8093ff7e735429fc9eb8750578d9e136db63c46f","node":"v24.19.0","adapterEngine":"js-yaml","adapterVersion":"4.3.2","limitation":"Not gray-matter 4.0.3/js-yaml 3.x or native agent/schema acceptance"}
+PASS multiline-request/quoted-control
+PASS multiline-request/colon-recovery
+PASS multiline-permissions/quoted-control
+PASS multiline-permissions/colon-recovery
+PASS alias-permissions/quoted-control
+PASS alias-permissions/colon-recovery
+6/6 intended-contract assertions passed; 0 failed
+(node:5) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

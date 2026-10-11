@@ -1,0 +1,121 @@
+{
+  "reviewedHead": "522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee",
+  "base": "7b3d4ce3a7dbd2a6d3637722a0d5f22a7d086937",
+  "sourceBlobs": {
+    "head": "c39f4305b77783e426f069981ddf4cb899a44739",
+    "base": "8093ff7e735429fc9eb8750578d9e136db63c46f"
+  },
+  "schemaReceipts": [
+    {
+      "path": "packages/schema/src/config/agent.ts",
+      "label": "schema-agent",
+      "sha": "c28933251b5829f50bfc06ed9d9a9934f1aef9a4",
+      "url": "https://github.com/anomalyco/opencode/blob/522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee/packages/schema/src/config/agent.ts",
+      "contentLength": 870,
+      "error": false
+    },
+    {
+      "path": "packages/schema/src/config/provider.ts",
+      "label": "schema-provider",
+      "sha": "98211cc2021ceee8d7c42580d85e1a7f3165e4b4",
+      "url": "https://github.com/anomalyco/opencode/blob/522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee/packages/schema/src/config/provider.ts",
+      "contentLength": 3542,
+      "error": false
+    },
+    {
+      "path": "packages/schema/src/permission.ts",
+      "label": "schema-permission",
+      "sha": "41887ed9ea640cacba355eabda2d54561747afbc",
+      "url": "https://github.com/anomalyco/opencode/blob/522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee/packages/schema/src/permission.ts",
+      "contentLength": 2282,
+      "error": false
+    },
+    {
+      "path": "packages/core/src/config/plugin/agent.ts",
+      "label": "decode-agent",
+      "sha": "1d3949d015eaf5cbc2cd19032454fc539c06eb40",
+      "url": "https://github.com/anomalyco/opencode/blob/522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee/packages/core/src/config/plugin/agent.ts",
+      "contentLength": 9563,
+      "error": false
+    }
+  ],
+  "lock": {
+    "url": "https://github.com/anomalyco/opencode/blob/522f93f24c9a3c715fb8e5e7b7a53666ef3b82ee/bun.lock",
+    "blob": "0d5fe6b5ee2586ff13008ee3e8f33764200a8121",
+    "note": "Contents API returned empty; read-only fetch_blob returned full source text. No dependency downloaded or installed.",
+    "entries": [
+      {
+        "line": 1139,
+        "text": "  \"overrides\": {"
+      },
+      {
+        "line": 4192,
+        "text": "    \"gray-matter\": [\"gray-matter@4.0.3\", \"\", { \"dependencies\": { \"js-yaml\": \"^3.13.1\", \"kind-of\": \"^6.0.2\", \"section-matter\": \"^1.0.0\", \"strip-bom-string\": \"^1.0.0\" } }, \"sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==\"],"
+      },
+      {
+        "line": 4468,
+        "text": "    \"js-yaml\": [\"js-yaml@3.15.1\", \"\", { \"dependencies\": { \"argparse\": \"^1.0.7\", \"esprima\": \"^4.0.0\" }, \"bin\": { \"js-yaml\": \"bin/js-yaml.js\" } }, \"sha512-S99WuO3HlhO3XN41EtYUNl9zzXjoJx7QvmipxsJVxtCBT0YHEFy+iOJhjSvrmV12nYhWpZaM8lPHkJm0yUMbag==\"],"
+      }
+    ],
+    "overrides": [
+      "  \"overrides\": {",
+      "    \"@effect/platform-node-shared\": \"catalog:\",",
+      "    \"@opentui/core\": \"catalog:\",",
+      "    \"@opentui/keymap\": \"catalog:\",",
+      "    \"@opentui/solid\": \"catalog:\",",
+      "    \"@types/bun\": \"catalog:\",",
+      "    \"@types/node\": \"catalog:\",",
+      "    \"bun-types\": \"1.4.2\",",
+      "    \"effect\": \"catalog:\",",
+      "    \"open\": \"11.0.4\",",
+      "    \"solid-js\": \"catalog:\",",
+      "  },",
+      "  \"catalog\": {",
+      "    \"@cloudflare/workers-types\": \"4.20251008.0\",",
+      "    \"@corvu/drawer\": \"0.2.4\",",
+      "    \"@effect/opentelemetry\": \"4.0.1\",",
+      "    \"@effect/platform-node\": \"4.0.1\","
+    ],
+    "grayMatterNestedYaml": []
+  },
+  "upstreamEngine": {
+    "url": "https://github.com/jonschlinkert/gray-matter/blob/master/lib/engines.js",
+    "blob": "38f993db06cf364191ac635a6590c2d29303297d",
+    "parse": "yaml.safeLoad.bind(yaml)",
+    "packageJsonBlob": "3ddd1efd15d879035f226d2e90b12f871c79872b",
+    "packageVersion": "4.0.3",
+    "dependency": "js-yaml ^3.13.1",
+    "caveat": "Read source; no gray-matter execution. master source observed with package version4.0.3, not a separately verified release archive."
+  },
+  "runtime": {
+    "node": "v24.19.0",
+    "actualAdapterEngines": [
+      "js-yaml4.3.2 load",
+      "yaml2.9.1 parse"
+    ],
+    "grayMatterInstalled": false,
+    "pinnedEngineExecuted": false
+  },
+  "results": {
+    "baseJsYaml": {
+      "exit": 0,
+      "pass": 6,
+      "fail": 0
+    },
+    "headJsYaml": {
+      "exit": 1,
+      "pass": 3,
+      "fail": 3
+    },
+    "baseYaml": {
+      "exit": 0,
+      "pass": 6,
+      "fail": 0
+    },
+    "headYaml": {
+      "exit": 1,
+      "pass": 3,
+      "fail": 3
+    }
+  }
+}

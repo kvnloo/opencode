@@ -1,0 +1,45 @@
+{"subject":"head","blob":"c39f4305b77783e426f069981ddf4cb899a44739","node":"v24.19.0","adapterEngine":"yaml","adapterVersion":"2.9.1","limitation":"Not gray-matter 4.0.3/js-yaml 3.x or native agent/schema acceptance"}
+PASS multiline-request/quoted-control
+FAIL multiline-request/colon-recovery: YAMLParseError: All mapping items must start at the same column at line 4, column 1:
+
+request: "{"
+  headers: {x-critic: context}
+^
+
+SANITIZED "---\ndescription: |-\n  Scope: test\nrequest: \"{\"\n  headers: {x-critic: context}\n}\nmode: subagent\n---\nBody"
+PARSE_OPTION undefined
+PASS multiline-permissions/quoted-control
+FAIL multiline-permissions/colon-recovery: YAMLParseError: All mapping items must start at the same column at line 4, column 1:
+
+permissions: "["
+  {action: read, resource: "*", effect: deny}
+^
+
+SANITIZED "---\ndescription: |-\n  Scope: test\npermissions: \"[\"\n  {action: read, resource: \"*\", effect: deny}\n]\nmode: subagent\n---\nBody"
+PARSE_OPTION undefined
+PASS alias-permissions/quoted-control
+FAIL alias-permissions/colon-recovery: AssertionError: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
+    description: 'Scope: test',
+    mode: 'subagent',
++   permissions: '[*rule]',
+-   permissions: [
+-     {
+-       action: 'read',
+-       effect: 'deny',
+-       resource: '*'
+-     }
+-   ],
+    request: {
+      body: {
+        rule: {
+          action: 'read',
+          effect: 'deny',
+
+SANITIZED "---\ndescription: |-\n  Scope: test\nrequest:\n  body:\n    rule: &rule {action: read, resource: \"*\", effect: deny}\npermissions: \"[*rule]\"\nmode: subagent\n---\nBody"
+PARSE_OPTION {"data":{"description":"Scope: test","request":{"body":{"rule":{"action":"read","resource":"*","effect":"deny"}}},"permissions":"[*rule]","mode":"subagent"},"content":"\nBody"}
+3/6 intended-contract assertions passed; 3 failed
+(node:35) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
