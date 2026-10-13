@@ -245,9 +245,9 @@ describe("ConfigNormalize", () => {
     expect(result.encoded.commands).toEqual({ fallback: { template: "legacy" }, valid: { template: "native" } })
     expect(result.encoded.providers).toEqual({ valid: { name: "Valid" } })
     expect(result.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
-      ["commands", "fallback"],
-      ["commands", "invalid"],
-      ["providers", "invalid"],
+      ["commands", "fallback", "template"],
+      ["commands", "invalid", "template"],
+      ["providers", "invalid", "env", "0"],
     ])
   })
 
@@ -274,6 +274,7 @@ describe("ConfigNormalize", () => {
     expect(result.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toContainEqual([
       "provider",
       "azure",
+      "env",
     ])
   })
 
@@ -371,7 +372,8 @@ describe("ConfigNormalize", () => {
     expect(invalid.encoded).not.toHaveProperty("formatter")
     expect(invalid.encoded).not.toHaveProperty("lsp")
     expect(invalid.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
-      ["formatter", "prettier"],
+      ["formatter", "prettier", "command", "0"],
+      // LSP entries are a union, so the failing member is not attributed to a field.
       ["lsp", "typescript"],
     ])
 
@@ -648,6 +650,26 @@ describe("ConfigNormalize", () => {
     ])
   })
 
+  test("localizes the field that invalidates a native provider model", () => {
+    const result = normalized({
+      providers: {
+        local: { models: { chat: { capabilities: { input: ["text"], output: ["text"] } } } },
+      },
+    })
+    expect(result.encoded.providers).toEqual({})
+    expect(result.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
+      ["providers", "local", "models", "chat", "capabilities", "tools"],
+    ])
+
+    expect(
+      normalized({
+        providers: {
+          local: { models: { chat: { capabilities: { tools: true, input: ["text"], output: ["text"] } } } },
+        },
+      }).diagnostics,
+    ).toEqual([])
+  })
+
   test("preserves explicit false, zero, empty list, and empty map presence", () => {
     const result = normalized({
       snapshot: false,
@@ -669,5 +691,70 @@ describe("ConfigNormalize", () => {
       experimental: { subagent_depth: 0 },
     })
     expect(result.encoded.share).toBeUndefined()
+  })
+})
+
+describe("ConfigNormalize production load boundary (diagnostic localization)", () => {
+  test("one invalid nested model leaf keeps a valid sibling provider and names the leaf", () => {
+    // Real normalize/load boundary used by config ingestion — not a helper reimplementation.
+    const result = ConfigNormalize.normalize({
+      providers: {
+        broken: {
+          models: {
+            chat: {
+              // Invalid nested leaf: capabilities.tools required by schema (diagnostic-only PR;
+              // capability default ownership lives in #49940/#50702).
+              capabilities: { input: ["text"], output: ["text"] },
+            },
+          },
+        },
+        healthy: { name: "Healthy" },
+      },
+    })
+
+    expect(result.encoded.providers).toEqual({ healthy: { name: "Healthy" } })
+    expect(result.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
+      ["providers", "broken", "models", "chat", "capabilities", "tools"],
+    ])
+    // Must not blame the whole provider alone.
+    expect(
+      result.diagnostics.some(
+        (item) => item.kind === "invalid" && item.path.length === 2 && item.path[0] === "providers" && item.path[1] === "broken",
+      ),
+    ).toBe(false)
+  })
+
+  test("negative: whole-object diagnostic path fails the leaf + sibling assertions", () => {
+    // Pre-fix style: discard the schema issue and only record the enclosing path.
+    const wholeObject = (path: string[]): { kind: "invalid"; path: string[]; message: string } => ({
+      kind: "invalid",
+      path,
+      message: "skipped malformed recognized value",
+    })
+    const simulated = {
+      encoded: { providers: {} as Record<string, unknown> },
+      diagnostics: [wholeObject(["providers", "broken"])],
+    }
+
+    // Sibling retention assertion (production): healthy provider must remain.
+    // Whole-object failure mode drops everything under providers → fails.
+    expect(simulated.encoded.providers).not.toEqual({ healthy: { name: "Healthy" } })
+
+    // Leaf-path assertion (production): must include capabilities.tools.
+    const paths = simulated.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)
+    expect(paths).not.toEqual([["providers", "broken", "models", "chat", "capabilities", "tools"]])
+    expect(paths.every((path) => path.length === 2)).toBe(true)
+
+    // Control: fixed normalize still satisfies both.
+    const fixed = ConfigNormalize.normalize({
+      providers: {
+        broken: { models: { chat: { capabilities: { input: ["text"], output: ["text"] } } } },
+        healthy: { name: "Healthy" },
+      },
+    })
+    expect(fixed.encoded.providers).toEqual({ healthy: { name: "Healthy" } })
+    expect(fixed.diagnostics.filter((item) => item.kind === "invalid").map((item) => item.path)).toEqual([
+      ["providers", "broken", "models", "chat", "capabilities", "tools"],
+    ])
   })
 })
