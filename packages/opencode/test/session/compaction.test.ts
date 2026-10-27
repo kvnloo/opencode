@@ -1973,3 +1973,108 @@ describe("SessionNs.getUsage", () => {
     expect(result.tokens.cache.write).toBe(300)
   })
 })
+
+// ---- wf-opencode-200 verification probe (local only, synthetic fixtures, not part of PR #200) ----
+import { LLMRequestPrep } from "@/session/llm/request"
+
+describe("wf-probe compaction agent variant", () => {
+  const probeModel = (): Provider.Model => ({
+    ...createModel({ context: 100_000, output: 32_000 }),
+    api: { id: "test-model", url: "https://example.invalid", npm: "@ai-sdk/openai-compatible" },
+    variants: { high: { probeVariant: "high" }, "no-thinking": { probeVariant: "no-thinking" } },
+  })
+  const probeCfg = (variant: string) => {
+    const base = Schema.decodeUnknownSync(ConfigV1.Info)({}) as ConfigV1.Info
+    return Layer.succeed(
+      Config.Service,
+      TestConfig.make({ get: () => Effect.succeed({ ...base, agent: { compaction: { variant } } }) }),
+    )
+  }
+  const probeUser = (sessionID: SessionID) =>
+    Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const msg = yield* ssn.updateMessage({
+        id: MessageID.ascending(),
+        role: "user",
+        sessionID,
+        agent: "build",
+        model: { ...ref, variant: "high" },
+        time: { created: Date.now() },
+      })
+      yield* ssn.updatePart({ id: PartID.ascending(), messageID: msg.id, sessionID, type: "text", text: "hello" })
+      return msg
+    })
+
+  itCompaction.instance(
+    "LABEL: summary assistant message records agent.compaction.variant",
+    () =>
+      Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const msg = yield* probeUser(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        yield* SessionCompaction.use.process({ parentID: msg.id, messages: msgs, sessionID: session.id, auto: false })
+        const found = (yield* ssn.messages({ sessionID: session.id })).find(
+          (item) => item.info.role === "assistant" && item.info.summary,
+        )
+        expect(found?.info.role === "assistant" ? found.info.variant : "missing").toBe("no-thinking")
+      }).pipe(withCompaction({ provider: ProviderTest.fake({ model: probeModel() }), config: probeCfg("no-thinking") })),
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "LABEL: an agent variant the model does not define is still recorded (no validation)",
+    () =>
+      Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const msg = yield* probeUser(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        yield* SessionCompaction.use.process({ parentID: msg.id, messages: msgs, sessionID: session.id, auto: false })
+        const found = (yield* ssn.messages({ sessionID: session.id })).find(
+          (item) => item.info.role === "assistant" && item.info.summary,
+        )
+        console.log("PROBE unknown-variant label =", found?.info.role === "assistant" ? found.info.variant : "missing")
+      }).pipe(withCompaction({ provider: ProviderTest.fake({ model: probeModel() }), config: probeCfg("bogus") })),
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "WIRE: the compaction LLM request options use agent.compaction.variant",
+    () => {
+      const stub = llm()
+      let captured: LLM.StreamInput | undefined
+      stub.push(reply("summary", (input) => (captured = input)))
+      const fakeProvider = ProviderTest.fake({ model: probeModel() })
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        const msg = yield* probeUser(session.id)
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        yield* SessionCompaction.use.process({ parentID: msg.id, messages: msgs, sessionID: session.id, auto: false })
+        expect(captured).toBeDefined()
+        console.log(
+          "PROBE captured StreamInput: agent.variant =",
+          captured!.agent.variant,
+          "| user.model.variant =",
+          captured!.user.model.variant,
+        )
+        const prepared = yield* LLMRequestPrep.prepare({
+          ...captured!,
+          provider: fakeProvider.info,
+          auth: undefined,
+          plugin: {
+            trigger: (_name: string, _input: unknown, output: unknown) => Effect.succeed(output),
+            list: () => Effect.succeed([]),
+            init: () => Effect.void,
+          } as any,
+          flags: { outputTokenMax: 32_000, client: "test" } as any,
+          isWorkflow: false,
+        })
+        console.log("PROBE prepared options.probeVariant =", prepared.params.options.probeVariant)
+        expect(prepared.params.options.probeVariant).toBe("no-thinking")
+      }).pipe(withCompaction({ llm: stub.llmLayer, provider: fakeProvider, config: probeCfg("no-thinking") }))
+    },
+    { git: true },
+  )
+})
